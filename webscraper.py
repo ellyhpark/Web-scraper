@@ -1,6 +1,6 @@
 import requests
-from bs4 import BeautifulSoup
-from bs4 import NavigableString
+from bs4 import BeautifulSoup, NavigableString
+import csv
 
 r = requests.get('https://chamber.sdbusinesschamber.com/list/search?q=&c=&sa=False&gr=25&gn=')
 soup = BeautifulSoup(r.text, 'html.parser')
@@ -8,25 +8,22 @@ soup = BeautifulSoup(r.text, 'html.parser')
 # list of all business boxes
 business_boxes = soup.find_all('div', class_='gz-list-card-wrapper')
 
-# for each business box
-    # check name exists and add to dictionary with key = 'name'
-    # do the same for description, address, phone, website link
-    # if info does not exist, add emty string as the value
-    # add the dictionary to the businesses list
+# 2D list containing lists that each represent a business
+businesses = [['Name', 'Description', 'Address', 'Phone', 'Website']]
 
-businesses = []
+# collect business name
+def get_business_name(box) -> str:
+    name_h5 = box.h5
+    if name_h5 is not None:
+        h5_children = name_h5.contents
+        anchor = h5_children[1]
+        name = str(anchor.string)
+    else:
+        name = ''
+    return name
 
-for box in business_boxes:
-    business = {}
-
-    # collect business name
-    h5_children = box.h5.contents
-    anchor = h5_children[1]
-    name = anchor.string
-    business['name'] = name
-    print(name)
-
-    # collect business description
+# collect business description
+def get_business_description(box) -> str:
     description_p = box.find('p', class_='card-text gz-description gz-member-description')
     if description_p is not None:
         description_p_children = description_p.contents
@@ -37,10 +34,10 @@ for box in business_boxes:
                 description += (child + ' | ')
     else:
         description = ''
-    business['description'] = description
-    print(description)
+    return description
 
-    # collect business address
+# collect business address
+def get_business_address(box) -> str:
     street_addr_span = box.find('span', class_='gz-street-address')
     if street_addr_span is not None:
         street_addr_span_children = street_addr_span.contents
@@ -71,21 +68,21 @@ for box in business_boxes:
         citystatezip_addr = ''
     
     address = street_addr + citystatezip_addr
-    business['address'] = address
-    print(address)
+    return address
 
-    # collect business phone
+# collect business phone
+def get_business_phone(box) -> str:
     phone_li = box.find('li', class_='gz-card-phone')
     if phone_li is not None:
         phone_li_children = phone_li.contents
         phone_a_children = phone_li_children[1].contents
-        phone = phone_a_children[1].string
+        phone = str(phone_a_children[1].string)
     else:
         phone = ''
-    business['phone'] = phone
-    print(phone)
+    return phone
 
-    # collect business website link
+# collect business website link
+def get_business_website(box) -> str:
     website_li = box.find('li', class_='gz-card-website')
     if website_li is not None:
         website_li_children = website_li.contents
@@ -93,8 +90,32 @@ for box in business_boxes:
         website = website_a['href']
     else:
         website = ''
-    business['website'] = website
-    print(website)
-    
-    businesses.append(business)
-    print('------------------------')
+    return website
+
+# gather info from each business box
+def update_businesses_list(business_boxes):
+    for box in business_boxes:
+        b = []
+
+        b.append(get_business_name(box))
+        b.append(get_business_description(box))
+        b.append(get_business_address(box))
+        b.append(get_business_phone(box))
+        b.append(get_business_website(box))
+        
+        businesses.append(b)
+
+    # for each business box
+        # check name exists and add to the b list
+        # do the same for description, address, phone, website link
+        # if info does not exist, add empty string for that category to the b list
+        # add the b list to the businesses list
+
+# write to CSV file
+def write_csv_file(businesses, filename):
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(businesses)
+
+update_businesses_list(business_boxes)
+write_csv_file(businesses, 'businesses.csv')
